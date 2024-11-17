@@ -12,6 +12,7 @@ enum class Product(val description: String, val deliveryTime: Long) {
 
 fun order(item: Product): Product {
     println("order: The ${item.description} are on the way")
+    //Thread.sleep = 이 스레드를 잠가서 다른 작업들이 수행되지 못하게 하는 것
     Thread.sleep(item.deliveryTime)
     println("order: The ${item.description} have arrived")
     return item
