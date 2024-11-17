@@ -51,3 +51,8 @@ suspend fun switchDownloadToRead(){
     println("Switching from Download to Reading")
     yield()
 }
+
+//멀티스레드 = cpu에서 스레드 생성, 블로킹을 물리적인 자원 선점으로... 운영체제에서 관리해서 성능 저하 일어남
+// 코루틴 = 자원 선점, 스레드 생성, cpu 자원 차지보다는 라이브러리 차원에서 스레드 안에서 작업 자체만 스위칭이라 효율적
+//  운영체제가 아님. 그래서 더 빠르게 작업 전환 가능
+// 지금 다 한 스레드 안에서 ...
