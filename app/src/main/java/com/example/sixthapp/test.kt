@@ -20,9 +20,9 @@ fun main() {
         launch {
             //file reading
             println("Job start")
-            yield()
+            switchReadToDownload()
             println("File 1 reading")
-            yield()
+            switchReadToDownload()
             println("File 2 reading")
         }
 
@@ -30,11 +30,24 @@ fun main() {
             //file download
             println("File 1 download")
             //여기에 yield 써주면 다시 위 코루틴 실행 후 나머지가 실행된다
-            yield()
+            switchDownloadToRead()
             println("File 2 download")
-            yield()
+            switchDownloadToRead()
         }
 
     }
 
+}
+
+suspend fun switchReadToDownload(){
+    println("Switching from Reading to Download")
+    //yield를 그냥 함수에 쓰면 오류남... 서스펜드 함수나 코루틴 안에서 되어야 하니까.
+    // 그럼 이 함수를 서스펜드로 만들어야 함
+    //  그리고 이 함수 역시도 코루틴이나 서스펜드 함수? 안에서 호출되어야 함
+    yield()
+}
+
+suspend fun switchDownloadToRead(){
+    println("Switching from Download to Reading")
+    yield()
 }
