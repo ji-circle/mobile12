@@ -1,6 +1,7 @@
 package com.example.sixthapp
 
 import kotlinx.coroutines.async
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.yield
@@ -10,51 +11,108 @@ enum class Product(val description: String, val deliveryTime: Long) {
     WINDOWS("windows", 1250)
 }
 
-fun order(item: Product): Product {
+//delay는 스레드 슬립처럼 스레드를 직접 관리하는 게 아니라, 코루틴의 서스펜드 함수.
+//  서스펜드함수는 서스펜드 함수 안에서 호출되어야 하니까 order도 suspend로 만들어준다
+//   이렇게 delay를 쓰면, 이걸 delay하는 동안 다른 코루틴이 활동할 수 있게 양보...
+suspend fun order(item: Product): Product {
     println("order: The ${item.description} are on the way")
-    //Thread.sleep = 이 스레드를 잠가서 다른 작업들이 수행되지 못하게 하는 것
-    Thread.sleep(item.deliveryTime)
+    //delay는 import kotlinx.coroutines.delay 이거의 Long
+    delay(item.deliveryTime)
+    //delay는 이 시간 뒤에 마저 할테니까 그 사이에는 다른 코루틴이 할수 있도록 양보...
+//    Thread.sleep(item.deliveryTime)
     println("order: The ${item.description} have arrived")
     return item
 }
 
-fun perform(taskName: String) {
+suspend fun perform(taskName: String) {
     println("task: Start $taskName")
-    Thread.sleep(1000)
+    delay(1000)
+//    Thread.sleep(1000)
     println("task: Finish $taskName")
 }
 
 fun main() {
-    /*
-        //Product.WINDOWS = 프로덕트 타입.
-        // 이걸 order로 넘기고 결과를 windows로 받음.
-        val windows = order(Product.WINDOWS)
-        val doors = order(Product.DOORS)
-        //위에 두 줄에 해당하는 것들이 다 끝날때까지 기다린 뒤 laying bricks를 하게 됨
-        perform("laying bricks")
-        //order = on the way 1.25초 지난 뒤에 arrived가 되고,
-        // perform =  위에가 다 실행된 뒤에 task가 실행됨... 그때는 1초 뒤에 finish가 됨
-        perform("installing ${windows.description}")
-        perform("installing ${doors.description}")
-        //위 코드대로면, doors가 더 빨리 끝남에도 불구하고 위에 줄이 다 끝난 뒤에야 해당 줄이 실행됨
-        println(windows)
-    */
 
-    //여기부터 위 코드들 수정한것
     runBlocking {
-        //어떤 값이 리턴값으로 들어가게 될때에는 launch가 아니라, async 라는 것을 사용
-        //  어떤 명령어가 수행되는것만이 아니라 그 수행 이후에 결과값을 받아오는 경우에는 async 사용
-        //그리고 이 값이 아래에서 사용될 경우, 해당 변수명 뒤에 .await()을 끼워넣기
         val windows = async { order(Product.WINDOWS) }
         val doors = async { order(Product.DOORS) }
 
         launch {
             perform("laying bricks")
-            perform("installing ${windows.await().description}")
-            perform("installing ${doors.await().description}")
+            //await = 해당 것이 오기전까지 기다리겠다. 잠깐 stop 하는 것
+            // 이 둘도 독립적인 scope로 하려면
+            launch {
+                perform("installing ${windows.await().description}")
+            }
+            launch {
+                perform("installing ${doors.await().description}")
+            }
         }
-
         println(windows.await())
     }
 
 }
+
+/* 이전 코드 - Thread.sleep 사용한 경우
+order: The windows are on the way
+order: The windows have arrived
+order: The doors are on the way
+order: The doors have arrived
+task: Start laying bricks
+task: Finish laying bricks
+task: Start installing windows
+task: Finish installing windows
+task: Start installing doors
+task: Finish installing doors
+WINDOWS
+*/
+
+/* 이후 코드 - delay 사용한 경우, launch 2개로 분리 하기 전
+order: The windows are on the way
+order: The doors are on the way
+task: Start laying bricks                      -- 위 3개가 거의 동시에 나온다 (delay때문에)
+
+order: The doors have arrived
+task: Finish laying bricks
+order: The windows have arrived
+WINDOWS
+task: Start installing windows
+task: Finish installing windows
+task: Start installing doors
+task: Finish installing doors
+*/
+
+
+/*
+order: The windows are on the way - 1 (-)
+
+order: The doors are on the way   - 3 (-1)
+
+task: Start laying bricks         - 5 (-2)
+
+order: The doors have arrived     - 4 (-)
+
+task: Finish laying bricks        - 6 (-1)
+
+order: The windows have arrived   - 2 (+4)
+
+WINDOWS                           - 11 (-4)
+task: Start installing windows    - 7 (+1)
+task: Finish installing windows   - 8 (+1)
+task: Start installing doors      - 9 (+1)
+task: Finish installing doors     - 10 (+1)
+*/
+
+/* launch 2개로 분리한 경우
+order: The windows are on the way
+order: The doors are on the way
+task: Start laying bricks
+order: The doors have arrived  -- 이 뒤 laying bricks
+task: Finish laying bricks
+task: Start installing doors
+order: The windows have arrived   -- 이거 되기 전에 door가 설치되고 있음
+WINDOWS
+task: Start installing windows
+task: Finish installing doors
+task: Finish installing windows
+*/
